@@ -1,484 +1,201 @@
-# MEAN Stack Application - DevOps Assignment
+# MEAN Stack Application - DevOps Setup
 
-A full-stack MEAN (MongoDB, Express, Angular, Node.js) application with complete CI/CD pipeline and Docker containerization.
+Full-stack MEAN (MongoDB, Express, Angular, Node.js) application with Docker containerization, CI/CD pipeline, and Nginx reverse proxy.
 
-## Table of Contents
-- [Architecture Overview](#architecture-overview)
-- [Prerequisites](#prerequisites)
-- [Local Development](#local-development)
-- [CI/CD Pipeline](#cicd-pipeline)
-- [Deployment on Azure VM](#deployment-on-azure-vm)
-- [Docker Hub Integration](#docker-hub-integration)
-- [Nginx Reverse Proxy](#nginx-reverse-proxy)
-- [Required Screenshots](#required-screenshots)
-- [Troubleshooting](#troubleshooting)
-
-## Architecture Overview
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Azure VM (Ubuntu 22.04)              │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │              Nginx Reverse Proxy                 │  │
-│  │                  (Port 80)                       │  │
-│  └────────┬─────────────────────────┬────────────────┘  │
-│           │                         │                   │
-│           │ /                       │ /api              │
-│           ▼                         ▼                   │
-│  ┌─────────────────┐      ┌─────────────────┐          │
-│  │    Frontend     │      │     Backend     │          │
-│  │  (Angular +     │      │  (Node.js +     │          │
-│  │    Nginx)       │      │    Express)     │          │
-│  │   Port 80       │      │   Port 8080     │          │
-│  └─────────────────┘      └────────┬────────┘          │
-│                                    │                   │
-│                                    ▼                   │
-│                          ┌─────────────────┐           │
-│                          │    MongoDB      │           │
-│                          │   Port 27017    │           │
-│                          │  (with volume)  │           │
-│                          └─────────────────┘           │
-│                                                         │
-│              Docker Network: mean-network               │
-└─────────────────────────────────────────────────────────┘
+Internet (Port 80)
+    ↓
+Nginx Reverse Proxy
+    ├─→ / → Frontend (Angular)
+    └─→ /api → Backend (Node.js + Express)
+              ↓
+          MongoDB
 ```
 
 ## Prerequisites
 
-### Local Development
-- Docker Desktop (Windows/Mac) or Docker Engine (Linux)
-- Docker Compose v2.0+
-- Git
-
-### Azure VM
-- Ubuntu 22.04 LTS
-- Docker and Docker Compose installed
-- Ports 22 (SSH) and 80 (HTTP) open
-
-### GitHub Repository
-- GitHub account with repository
+- Docker and Docker Compose
 - Docker Hub account
-- GitHub Secrets configured:
-  - `DOCKER_USERNAME` - Your Docker Hub username
-  - `DOCKER_PASSWORD` - Your Docker Hub access token
+- GitHub account
+- Azure VM (Ubuntu 22.04) with ports 22 and 80 open
 
-## Local Development
+## Local Setup
 
-### 1. Clone the Repository
-
+### 1. Clone Repository
 ```bash
-git clone <your-repo-url>
-cd <repo-name>
+git clone <repository-url>
+cd assignment-dd
 ```
 
-### 2. Configure Environment Variables
-
+### 2. Configure Environment
 ```bash
-# Copy the example environment file
 cp .env.example .env
-
-# Edit .env and replace with your Docker Hub username
-# DOCKER_USERNAME=your-dockerhub-username
+# Edit .env and set DOCKER_USERNAME=<Your docker username>
 ```
 
-### 3. Build and Run Locally
-
+### 3. Build and Run
 ```bash
-# Build and start all services
 docker compose up -d --build
+```
 
-# View logs
-docker compose logs -f
-
-# Check service status
+### 4. Verify
+```bash
 docker compose ps
+curl http://localhost/health
 ```
 
-### 4. Access the Application
+Access application at: http://localhost
 
-- Frontend: http://localhost
-- Backend API: http://localhost/api
-- MongoDB: localhost:27017
+## CI/CD Pipeline Setup
 
-### 5. Stop Services
+### 1. Configure GitHub Secrets
+Navigate to: `Repository → Settings → Secrets and variables → Actions`
 
+Add two secrets:
+- `DOCKER_USERNAME`: <Your-docker-hub-username>
+- `DOCKER_PASSWORD`: Your Docker Hub access token
+
+![GitHub Secrets](github-secret-ss.png "Github secret")
+```
+
+### 2. Trigger Pipeline
 ```bash
-# Stop all services
-docker compose down
-
-# Stop and remove volumes (clears database)
-docker compose down -v
+git add .
+git commit -m "Deploy application"
+git push origin main
 ```
 
-## CI/CD Pipeline
+### 3. Monitor Workflow
+Navigate to: `Repository → Actions`
 
-### GitHub Actions Workflow
+![GitHub workflow success](github-workflow-success.png "Github workflow success")
 
-The CI/CD pipeline is defined in `.github/workflows/ci-cd.yml` and automatically:
+![GitHub workflow logs](git-actions-logs.png "Github workflow logs")
 
-1. **Triggers** on every push to the `main` branch
-2. **Validates** GitHub Secrets (DOCKER_USERNAME, DOCKER_PASSWORD)
-3. **Builds** Docker images for backend and frontend
-4. **Tags** images with `latest` and commit SHA
-5. **Pushes** images to Docker Hub
-6. **Caches** layers for faster subsequent builds
+The workflow automatically:
+- Builds backend and frontend Docker images
+- Pushes images to Docker Hub (your-username/mean-backend, your-username/mean-frontend)
+- Tags with `latest` and `main-<commit-sha>`
 
-### Workflow Steps
+## Azure VM Deployment
 
-```yaml
-Checkout Code → Verify Secrets → Setup Docker Buildx → 
-Login to Docker Hub → Build Backend → Push Backend → 
-Build Frontend → Push Frontend → Success
-```
-
-### Why GitHub Actions?
-
-- **Native Integration**: Built into GitHub, no external CI/CD tool needed
-- **Free for Public Repos**: Generous free tier for private repos
-- **Docker Support**: Excellent Docker and container registry support
-- **Secrets Management**: Secure credential storage
-- **Simple Configuration**: YAML-based, easy to understand and maintain
-
-### Viewing Pipeline Status
-
-1. Go to your GitHub repository
-2. Click on the "Actions" tab
-3. View workflow runs and logs
-4. Check for successful builds and pushes
-
-## Docker Hub Integration
-
-### Image Naming Convention
-
-Images are pushed to Docker Hub with the following naming:
-
-```
-<DOCKER_USERNAME>/mean-backend:latest
-<DOCKER_USERNAME>/mean-backend:main-<commit-sha>
-
-<DOCKER_USERNAME>/mean-frontend:latest
-<DOCKER_USERNAME>/mean-frontend:main-<commit-sha>
-```
-
-### Why Docker Hub?
-
-- **Public Registry**: Free for public images
-- **Reliable**: Industry-standard container registry
-- **Fast Pulls**: Optimized for quick image downloads
-- **Version Control**: Multiple tags for different versions
-- **CI/CD Integration**: Easy integration with GitHub Actions
-
-### Manual Push (Optional)
-
+### 1. SSH to VM
 ```bash
-# Set your Docker Hub username
-export DOCKER_USERNAME=your-dockerhub-username
-
-# Build images
-docker compose build
-
-# Tag images
-docker tag crud-dd-task-mean-app-backend:latest $DOCKER_USERNAME/mean-backend:latest
-docker tag crud-dd-task-mean-app-frontend:latest $DOCKER_USERNAME/mean-frontend:latest
-
-# Login to Docker Hub
-docker login
-
-# Push images
-docker push $DOCKER_USERNAME/mean-backend:latest
-docker push $DOCKER_USERNAME/mean-frontend:latest
+ssh azureuser@<vm-public-ip>
 ```
 
-## Deployment on Azure VM
-
-### Initial VM Setup
-
+### 2. Clone and Configure
 ```bash
-# SSH into your Azure VM
-ssh azureuser@<your-vm-ip>
-
-# Verify Docker is installed
-docker --version
-docker compose version
-
-# Create application directory
-mkdir -p ~/mean-app
-cd ~/mean-app
+mkdir -p ~/mean-app && cd ~/mean-app
+git clone <repository-url> .
+echo "DOCKER_USERNAME=your-docker-hub-username" > .env
 ```
 
-### Deploy Application
-
-#### Option 1: Clone Repository (Recommended)
-
+### 3. Deploy
 ```bash
-# Clone the repository
-git clone <your-repo-url> .
-
-# Create .env file with your Docker Hub username
-echo "DOCKER_USERNAME=your-dockerhub-username" > .env
-
-# Pull latest images from Docker Hub
-docker compose pull
-
-# Start services
-docker compose up -d
-
-# View logs
-docker compose logs -f
+docker-compose pull
+docker-compose up -d
 ```
 
-#### Option 2: Manual Deployment (Without Git)
-
+### 4. Verify
 ```bash
-# Create docker-compose.yml and nginx/nginx.conf manually
-# Or copy from local machine using scp
-
-# Set environment variable
-export DOCKER_USERNAME=your-dockerhub-username
-
-# Pull and start
-docker compose pull
-docker compose up -d
+docker-compose ps
+curl http://localhost/health
 ```
 
-### Verify Deployment
+### 5. Configure Azure NSG
+In Azure Portal:
+- Navigate to VM → Networking → Inbound port rules
+- Add rule: Port 80, Protocol TCP, Action Allow
 
-```bash
-# Check running containers
-docker compose ps
+![Azure NSG](azure-nsg.png "Azure NSG")
 
-# Check logs
-docker compose logs backend
-docker compose logs frontend
-docker compose logs nginx
+### 6. Access Application
+Open browser: `http://<vm-public-ip>`
 
-# Test the application
-curl http://localhost
-curl http://localhost/api
-```
+![App frontend](app-UI-1.png "App frontend")
+![App frontend 2](app-UI-2.png "App frontend 2")
 
-### Update Deployment
+![backend](backend.png "backend")
 
-```bash
-# Pull latest images
-docker compose pull
-
-# Restart services with new images
-docker compose up -d
-
-# Remove old images (optional)
-docker image prune -f
-```
 
 ## Nginx Reverse Proxy
 
-### Architecture Decision
+Configuration file: `nginx/nginx.conf`
 
-A dedicated Nginx reverse proxy container sits in front of the application for several reasons:
+Routes:
+- `/` → Frontend service (port 80)
+- `/api` → Backend service (port 8080)
+- `/health` → Health check endpoint
 
-#### Why Separate Reverse Proxy?
+![nginx](nginx.png "nginx")
 
-1. **Single Entry Point**: All traffic enters through port 80
-2. **Routing Logic**: Centralized routing configuration
-3. **Security**: Backend and frontend not directly exposed
-4. **Scalability**: Easy to add load balancing or SSL termination
-5. **Separation of Concerns**: Frontend Nginx serves static files, reverse proxy handles routing
 
-### Routing Configuration
+## Docker Images
 
-```nginx
-/ → frontend:80 (Angular SPA)
-/api → backend:8080 (Express API)
-/health → Health check endpoint
+- Backend: `your-docker-username/mean-backend:latest`
+- Frontend: `your-docker-username/mean-frontend:latest`
+
+![docker-images](docker-images.png "docker-images")
+
+## Infrastructure Details
+
+### Services
+- **MongoDB**: Official mongo:6 image with persistent volume
+- **Backend**: Node.js 18 Alpine, Express API
+- **Frontend**: Angular 15, multi-stage build with Nginx
+- **Nginx**: Alpine-based reverse proxy
+
+### Health Checks
+- MongoDB: Database ping every 10s
+- Backend: HTTP check on port 8080 every 10s
+- Nginx: Health endpoint check every 10s
+
+### Volumes
+- `mongodb_data`: Persistent MongoDB storage
+
+### Network
+- `mean-network`: Bridge network for service communication
+
+![container-usage](container-usage.png "container-usage")
+
+## Common Commands
+
+### Local Development
+```bash
+docker compose up -d          # Start services
+docker compose down           # Stop services
+docker compose logs -f        # View logs
+docker compose ps             # Check status
 ```
 
-### Configuration File
-
-Located at `nginx/nginx.conf`:
-
-- **Upstream Definitions**: Define backend and frontend services
-- **Proxy Headers**: Forward client information (IP, protocol)
-- **Health Checks**: Simple endpoint for monitoring
-- **HTTP/1.1**: WebSocket support if needed
-
-### Why This Approach?
-
-- **Production-Ready**: Standard pattern for microservices
-- **Flexible**: Easy to add new services or routes
-- **Maintainable**: Clear separation between routing and application logic
-- **Portable**: Same configuration works locally and in production
-
-## Required Screenshots
-
-For your DevOps assignment submission, capture the following screenshots:
-
-### 1. GitHub Actions Pipeline
-- [ ] Screenshot of successful workflow run in GitHub Actions tab
-- [ ] Screenshot showing all steps completed successfully
-- [ ] Screenshot of workflow logs showing image push to Docker Hub
-
-### 2. Docker Hub
-- [ ] Screenshot of Docker Hub repository showing `mean-backend` image
-- [ ] Screenshot of Docker Hub repository showing `mean-frontend` image
-- [ ] Screenshot showing image tags (latest and commit SHA)
-
-### 3. Azure VM Deployment
-- [ ] Screenshot of `docker compose ps` showing all containers running
-- [ ] Screenshot of `docker compose logs` showing successful startup
-- [ ] Screenshot of application running in browser (http://VM-IP)
-
-### 4. Application Functionality
-- [ ] Screenshot of frontend homepage
-- [ ] Screenshot of API response (http://VM-IP/api)
-- [ ] Screenshot showing CRUD operations working
-
-### 5. Configuration Files
-- [ ] Screenshot of `.github/workflows/ci-cd.yml`
-- [ ] Screenshot of `docker-compose.yml`
-- [ ] Screenshot of `nginx/nginx.conf`
-
-### 6. GitHub Repository
-- [ ] Screenshot of repository structure
-- [ ] Screenshot of GitHub Secrets configuration page (blur sensitive values)
+### VM Deployment
+```bash
+docker-compose pull           # Pull latest images
+docker-compose up -d          # Start/update services
+docker-compose ps             # Check status
+docker-compose logs -f        # View logs
+```
 
 ## Troubleshooting
 
-### GitHub Actions Fails
-
-**Problem**: Workflow fails with authentication error
-
-**Solution**:
+### Port 80 in use
 ```bash
-# Verify secrets are set in GitHub
-# Go to: Settings → Secrets and variables → Actions
-# Ensure DOCKER_USERNAME and DOCKER_PASSWORD are set
-```
-
-### Images Not Pulling on VM
-
-**Problem**: `docker compose pull` fails
-
-**Solution**:
-```bash
-# Ensure .env file has correct username
-cat .env
-
-# Or set environment variable
-export DOCKER_USERNAME=your-dockerhub-username
-
-# Try pulling manually
-docker pull $DOCKER_USERNAME/mean-backend:latest
-docker pull $DOCKER_USERNAME/mean-frontend:latest
-```
-
-### Backend Cannot Connect to MongoDB
-
-**Problem**: Backend logs show "Cannot connect to database"
-
-**Solution**:
-```bash
-# Check MongoDB is running
-docker compose ps mongodb
-
-# Check MongoDB logs
-docker compose logs mongodb
-
-# Restart services
-docker compose restart backend
-```
-
-### Port 80 Already in Use
-
-**Problem**: Cannot bind to port 80
-
-**Solution**:
-```bash
-# Check what's using port 80
 sudo lsof -i :80
-
-# Stop conflicting service
-sudo systemctl stop apache2  # or nginx
-
-# Or change port in docker-compose.yml
-ports:
-  - "8080:80"  # Access via port 8080
+sudo systemctl stop apache2
 ```
 
-### Frontend Shows 502 Bad Gateway
-
-**Problem**: Nginx cannot reach backend/frontend
-
-**Solution**:
+### Check logs
 ```bash
-# Check all services are running
-docker compose ps
-
-# Check network connectivity
-docker compose exec nginx ping backend
-docker compose exec nginx ping frontend
-
-# Restart nginx
-docker compose restart nginx
+docker compose logs backend
+docker compose logs nginx
 ```
 
-## DevOps Best Practices Implemented
-
-### 1. Infrastructure as Code
-- All infrastructure defined in `docker-compose.yml`
-- Reproducible across environments
-- Version controlled
-
-### 2. CI/CD Automation
-- Automated builds on every commit
-- Automated testing and deployment
-- Fast feedback loop
-
-### 3. Container Orchestration
-- Multi-container application
-- Service dependencies managed
-- Health checks for reliability
-
-### 4. Security
-- No hardcoded credentials
-- Secrets managed via GitHub Secrets
-- Minimal container images (Alpine Linux)
-
-### 5. Monitoring
-- Health check endpoints
-- Container health checks
-- Centralized logging via Docker
-
-### 6. Scalability
-- Microservices architecture
-- Stateless application containers
-- Persistent data in volumes
-
-## Project Structure
-
-```
-.
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yml           # GitHub Actions CI/CD pipeline
-├── backend/
-│   ├── app/
-│   ├── Dockerfile              # Backend container definition
-│   ├── package.json
-│   └── server.js
-├── frontend/
-│   ├── src/
-│   ├── Dockerfile              # Frontend multi-stage build
-│   ├── nginx.conf              # Frontend Nginx config
-│   ├── package.json
-│   └── angular.json
-├── nginx/
-│   └── nginx.conf              # Reverse proxy configuration
-├── docker-compose.yml          # Multi-container orchestration
-├── .env.example                # Environment variables template
-├── .dockerignore               # Docker build exclusions
-├── DOCKER.md                   # Docker documentation
-└── README.md                   # This file
+### Restart service
+```bash
+docker compose restart backend
 ```
 
 ## Technology Stack
@@ -489,17 +206,26 @@ docker compose restart nginx
 - **Containerization**: Docker, Docker Compose
 - **CI/CD**: GitHub Actions
 - **Registry**: Docker Hub
-- **Reverse Proxy**: Nginx
+- **Reverse Proxy**: Nginx Alpine
 - **Cloud**: Azure VM (Ubuntu 22.04)
 
-## License
+## Project Structure
 
-This project is for educational purposes as part of a DevOps assignment.
+```
+.
+├── .github/workflows/
+│   └── ci-cd.yml              # GitHub Actions pipeline
+├── backend/
+│   ├── app/                   # Express application
+│   ├── Dockerfile             # Backend container
+│   └── server.js              # Entry point
+├── frontend/
+│   ├── src/                   # Angular application
+│   ├── Dockerfile             # Multi-stage frontend build
+│   └── nginx.conf             # Frontend Nginx config
+├── nginx/
+│   └── nginx.conf             # Reverse proxy config
+├── docker-compose.yml         # Service orchestration
+└── .env.example               # Environment template
+```
 
-## Support
-
-For issues or questions:
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Review Docker and container logs
-3. Verify all prerequisites are met
-4. Check GitHub Actions workflow logs
